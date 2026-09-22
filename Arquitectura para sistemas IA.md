@@ -117,6 +117,19 @@ R.N.F 13: El proceso de integración y despliegue continuo (CI/CD) debe ejecutar
 
 R.N.F 14: La arquitectura debe ser flexible y desacoplada, permitiendo la sustitución o actualización del algoritmo del modelo de aprendizaje automático sin interrumpir la operación continua del servicio.
 
+### 1.1.5 Componentes principales de la arquitectura
+
+Los cuatro componentes exigidos (datos, modelo, API e interfaz) se materializan en ShopFast de la siguiente manera:
+
+| Componente | Función específica | Tecnología en el caso (ShopFast) | Requerimiento(s) que satisface |
+|---|---|---|---|
+| **Datos** | Ingesta, limpieza y persistencia del histórico de interacciones y del catálogo que alimentan al motor | Amazon RDS (MySQL) para transacciones en caliente; Amazon S3 como data lake (12 meses, 2 GB); pandas para transformación | R.F 6, R.F 7, R.N.F 6 |
+| **Modelo** | Generar recomendaciones personalizadas: filtrado colaborativo con puntaje de relevancia y alternativa de *fallback* | Python Surprise 1.1.3 (SVD); entrenamiento en Amazon SageMaker (ml.t3.medium, semanal) y artefacto serializado versionado en S3 (Model Registry) | R.F 5, R.F 8, R.N.F 7, R.N.F 14 |
+| **API** | Exponer el modelo como servicio REST seguro, disponible y con control de consumo | Flask sobre AWS Lambda + API Gateway: `GET /recommendations/{user_id}`, `POST /track-interaction`, `GET /health` | R.F 9, R.F 11, R.N.F 1, R.N.F 5, R.N.F 9, R.N.F 10, R.N.F 12 |
+| **Interfaz** | Presentar las recomendaciones al usuario final y permitir su interacción | Frontend React: homepage "Recomendado para ti" (10 productos) y página de producto "También te puede interesar" (5 productos), con tarjetas de imagen, nombre, precio y botón | R.F 1, R.F 2, R.F 3, R.F 4, R.F 10 |
+
+Relacionando cada componente con su función mediante modelos de referencia (apartado c de la pauta), los cuatro encadenan el ciclo de vida **MLOps**: *ingesta* (RDS MySQL + S3) → *entrenamiento* (SageMaker, disparado semanalmente por EventBridge) → *registro de modelo* (S3 como Model Registry del artefacto SVD) → *despliegue* (API Gateway + Lambda con inferencia serverless) → *monitoreo y retroalimentaje* (CloudWatch para métricas/alarms y `POST /track-interaction` para reincorporar interacciones al data lake). Este flujo es la manifestación práctica de la **arquitectura de referencia de AWS** para workloads de IA, en la que cada servicio cubre una etapa del ciclo sin acoplar el modelo al código de la aplicación, cumpliendo además la flexibilidad exigida en R.N.F 14.
+
 ### 1.1.6 Ciclo de vida y elementos de los datos
 
 A continuación se describe el ciclo de vida de los datos: desde su ingesta, pasando por su procesamiento y almacenamiento, hasta su consumo por el modelo de aprendizaje.
@@ -195,7 +208,29 @@ El sistema implementa mecanismos de tolerancia a fallos y degradación elegante 
 
 ### 1.2.6 Decisiones arquitectónicas clave, basadas en principios de observabilidad y confiabilidad
 
-En estos apartados sobresale herramientas como github actions, la cual hace un filtro de "calidad" de código procesado antes de pasar a producción (por ejemplo en lo que se genera en el pipeline), también el uso CloudWatch sirve para generar auditorías y generar alertas en caso de estar en riesgo el rendimiento, también sirve como un respaldo ante fallos. Al final el sistema contiene elementos que previenen la caída del sistema.
+**Decisión 1 — Despliegue Canary gobernado por alarmas de CloudWatch**
+- **Decisión:** el pipeline de GitHub Actions + AWS SAM despliega incrementalmente 10% de tráfico por minuto y CloudWatch actúa como árbitro del proceso: si la tasa de error supera el 3%, se revierte automáticamente a la última versión estable.
+- **Principio(s):** observabilidad y confiabilidad.
+- **Alternativas descartadas:** despliegue directo o _big bang_ (expone el 100% del tráfico sin señal previa de regresión) y _blue/green_ completo (duplica infraestructura, tensionando el límite de costos del R.N.F 4).
+- **Consecuencia/validación:** cumple el R.N.F 13 (Canary 10%/min con rollback ante error >3%) y sostiene el uptime de 99.4%, por sobre el 99% exigido en R.N.F 2.
+
+**Decisión 2 — Resiliencia en inferencia: retry, timeout 2 s y fallback**
+- **Decisión:** ante errores 5xx el cliente reintenta una vez con un timeout de 2 segundos y, si el motor falla, degrada a un listado de productos más vendidos cacheado.
+- **Principio(s):** confiabilidad.
+- **Alternativas descartadas:** propagar el error al usuario (rompe la continuidad del servicio) y esperas de retry superiores a 2 s (incompatible con la latencia p95 de 420 ms).
+- **Consecuencia/validación:** cumple R.N.F 12 (fallback en <500 ms) y R.F 8, manteniendo p50 de 235 ms y tasa de error de 0.8%.
+
+**Decisión 3 — Trazas `request_id` sin PII y alarmas segmentadas**
+- **Decisión:** Lambda emite logs JSON estructurados con `request_id` y sin datos personales, y CloudWatch configura alarmas Warning (latencia >800 ms) y Crítica (latencia >1.5 s o errores >5%).
+- **Principio(s):** observabilidad.
+- **Alternativas descartadas:** logs en texto libre (impiden correlación por petición) y un único umbral de alarma (genera fatiga de alerta o detección tardía).
+- **Consecuencia/validación:** cumple R.N.F 11; permite detectar incidentes en menos de 15 minutos monitoreando p50 235 ms, p95 420 ms, p99 780 ms, cold starts 4.2% y errores 0.8%.
+
+**Decisión 4 — Modelo inmutable en S3 y health check `/health`**
+- **Decisión:** cada modelo SVD se registra como artefacto versionado e inmutable en S3 y API Gateway expone `GET /health` para verificar el estado operativo antes y durante la operación.
+- **Principio(s):** confiabilidad y observabilidad.
+- **Alternativas descartadas:** sobrescribir el archivo del modelo (impide revertir a una versión conocida) y confiar únicamente en la ausencia de errores reportados (detección reactiva).
+- **Consecuencia/validación:** garantiza la recuperabilidad del artefacto y la actualización sin interrupción del R.N.F 14, coherente con R.N.F 6 (S3 como repositorio duradero).
 
 ## 1.3 Especificación de infraestructura
 
@@ -263,9 +298,24 @@ Como estrategia de integración y entrega se seleccionó **CI/CD (Continuous Int
 
 Como estrategia de despliegue de modelos en producción se seleccionó **Canary Deployment**, la cual minimiza el riesgo frente a los usuarios: a medida que las métricas son positivas, el modelo se despliega progresivamente, reduciendo la probabilidad de fallos que arruinen la experiencia de los usuarios.
 
+### 1.4.1 Uso de edge computing
+
+Dentro de la selección de estrategias de despliegue también se evaluó el *edge computing*, es decir, ejecutar lógica y almacenar contenido en puntos de la red cercanos al usuario final. Para ShopFast se recomienda una **adopción parcial** coherente con su patrón *serverless*: servir el frontend React mediante **Amazon CloudFront** y usar **Lambda@Edge** para cachear cerca del usuario el *fallback* de productos más vendidos (R.F 8), de modo que la respuesta degradada se cumpla en menos de 500 ms incluso si el motor de recomendaciones falla (R.N.F 12), mejorando la latencia efectiva y la tolerancia a fallos sin duplicar infraestructura (uso actual ~$50 de un tope de $200/mes). Se descarta, en cambio, llevar la inferencia SVD al *edge*: el modelo se reentrena de forma centralizada y semanal (SageMaker), mantiene estado compartido en RDS y S3, y su serializado periódico en nodos distribuidos elevaría la complejidad y el costo sin beneficio medible frente a la latencia *warm* de 300 ms ya alcanzada. El cómputo *edge* queda, por tanto, limitado a entrega y caché, no a inferencia.
+
 ### 1.4.2 Comparación de alternativas de integración evaluando eficiencia, rendimiento y confiabilidad
 
 Se evaluaron además las estrategias **Blue/Green Deployment, Rolling (Progresivo), Big Bang, Despliegue por fases y Despliegue Shadow**:
+
+| Estrategia | Eficiencia | Rendimiento | Confiabilidad | Decisión en este caso |
+|---|---|---|---|---|
+| Blue/Green | Baja: duplica entornos y costos | Alto: conmutación instantánea de tráfico | Alta: reversión inmediata | Descartada: duplicaría el presupuesto de $200/mes |
+| Rolling (Progresivo) | Alta: reutiliza una sola infraestructura | Medio: depende de compatibilidad entre versiones | Media: reversión más lenta | Descartada: poca visión del rendimiento del modelo en producción |
+| Big Bang | Alta: un solo evento de despliegue | Riesgoso: pico único sin validación previa | Baja: sin reversión gradual | Descartada: máxima exposición de los 50.000 clientes a fallos |
+| Por fases | Media: exige segmentar por grupos o regiones | Alto dentro de cada segmento | Media-alta: daño acotado por segmento | Descartada: mayor costo de soporte e inversión por regiones |
+| Shadow | Media: duplica tráfico sin impacto en usuario | Alto para comparar versiones en paralelo | Alta para validación, nula para el usuario | Descartada: el usuario nunca ve el modelo, no mide la conversión |
+| **Canary (elegida)** | **Alta: un solo entorno, despliegue gradual de 10% por minuto** | **Se valida con tráfico real desde el primer minuto** | **Alta: rollback automático si el error rate supera el 3%** | **Elegida: progresión hasta el 100% con reversión automática** |
+
+Se elige Canary porque es la alternativa más **eficiente** al operar sobre un único entorno *serverless* sin duplicar costos, la de mejor **rendimiento** observable al medir el modelo SVD con tráfico real desde el 10% inicial, y la más **confiable** al acoplar CloudWatch a un rollback automático ante un error rate superior al 3%. Las alternativas evaluadas se detallan a continuación:
 
 #### Blue/Green Deployment
 
@@ -329,3 +379,25 @@ El proceso de entrega continua se ejecuta en 5 etapas secuenciales:
 ![Diagrama de flujo de despliegue (elaborado en Draw.io)](DiagramaShopPipeline.jpg)
 
 _Diagrama elaborado en Draw.io (fuente editable: DiagramaShopPipeline.drawio)._
+
+## Referencias
+
+Amazon Web Services. (2025, 19 de noviembre). *Machine Learning Lens — AWS Well-Architected Framework*. Recuperado el 22 de septiembre de 2026, de https://docs.aws.amazon.com/wellarchitected/latest/machine-learning-lens/machine-learning-lens.html
+
+Kreuzberger, D., Kühl, N., & Hirschl, S. (2023). Machine Learning Operations (MLOps): Overview, Definition, and Architecture. *IEEE Access*, *11*, 31866–31879. https://doi.org/10.1109/ACCESS.2023.3262138
+
+Testi, M., Ballabio, M., Frontoni, E., Iannello, G., Moccia, S., Soda, P., & Vessio, G. (2022). MLOps: A taxonomy and a methodology. *IEEE Access*, *10*, 63606–63618. https://doi.org/10.1109/ACCESS.2022.3181730
+
+The Codest. (s. f.). *Deployment strategies*. Recuperado el 22 de septiembre de 2026, de https://thecodest.co/en/dictionary/deployment-strategies/
+
+## Declaración de uso de herramientas de IA generativa
+
+Durante el desarrollo de este trabajo se utilizaron herramientas de inteligencia artificial generativa como apoyo al proceso de investigación, redacción y revisión. El uso de estas herramientas se resume a continuación, indicando la herramienta empleada y el propósito específico en cada caso:
+
+| Herramienta | Propósito de uso |
+|---|---|
+| [VERIFICAR: p. ej. ChatGPT / Gemini / Copilot] | Redacción inicial, reestructuración y revisión de coherencia y estilo de las secciones del informe. |
+| [VERIFICAR: p. ej. ChatGPT / GitHub Copilot / Mermaid AI] | Generación de borradores de código (plantillas AWS SAM, flujos de GitHub Actions) y bocetos de diagramas de arquitectura, posteriormente editados por el equipo. |
+| Documentación técnica oficial (AWS, GitHub) y verificación manual | Todo el contenido técnico —arquitectura, servicios, estrategia de despliegue canary y referencias— fue contrastado y verificado por el equipo contra la documentación oficial antes de su inclusión; la responsabilidad del contenido final es del equipo. |
+
+[VERIFICAR: nombre exacto de cada herramienta, versión/modelo y fecha de uso, según lo que realmente empleó el equipo.]
