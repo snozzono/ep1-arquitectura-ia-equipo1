@@ -1,0 +1,9 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "commands": {
+    "informe": {
+      "description": "Regenerar, validar y publicar el informe EP1 (PDF <=10 paginas + DOCX + commit/push)",
+      "template": "Ejecuta el flujo completo del informe EP1 Equipo 1 siguiendo este checklist:\n\n1. FUENTE: trabajo/Arquitectura para sistemas IA.md es la unica fuente de verdad. Si hay cambios de contenido, valida antes: secciones 1.1-1.4 completas, el indice coincide con los encabezados, 11 R.F y 14 R.N.F presentes, 5 tablas bien formadas, cero marcadores [VERIFICAR] o [cite:], negritas cerradas, portada y declaracion de IA completas.\n2. COMPRESSION (solo si wc -w > 4600): lanzar subagente de compresion con reglas duras: NO tocar R.F/R.N.F, las 5 tablas, la imagen del diagrama, referencias APA, declaracion de IA, numeracion de encabezados ni datos numericos; comprimir solo prosa (1.2.x, 1.4.2, 1.1.7, 1.3.x). Verificar el diff antes de aplicar.\n3. PDF: python herramientas/generar_pdf.py  (genera HTML intermedio en herramientas/, imprime con Edge y FALLA si sale >10 paginas). Si excede, primero ajustar layout en el CSS del script; si aun asi no baja, comprimir contenido.\n4. DOCX: python herramientas/generar_docx.py  (verificar: 5 tablas, 1 imagen, 2 page breaks, 0 restos de markdown).\n5. PUBLICAR: git add -A && git commit -m <mensaje descriptivo> && git push.\n6. REPORTAR: palabras (wc -w), paginas del PDF, hash del commit y URL del repo (https://github.com/snozzono/ep1-arquitectura-ia-equipo1).\n\nConvenciones del repo: entregables/ (EP1_Equipo1_HigueraDuranSalazar.pdf|.docx), trabajo/ (md + png + drawio), herramientas/ (scripts e HTML intermedio, regenerable), insumos/ (pauta y caso del profe), versiones_antiguas/ (obsoletos, no borrar). Limite duro de la pauta EP1: PDF maximo 10 paginas. Despues de editar opencode.json o agregar MCPs, avisar que hace falta nueva sesion o reinicio de servicio."
+    }
+  }
+}
