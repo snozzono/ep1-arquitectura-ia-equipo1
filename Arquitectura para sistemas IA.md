@@ -6,18 +6,22 @@
 
 - **Asignatura:** Arquitectura de Sistemas de Inteligencia Artificial
 - **Sigla:** ITY1102
-- **Institución:** Duoc UC — Subdirección de Diseño Curricular e Instruccional 2025
-- **Tipo de evaluación:** Parcial 1 — ponderación 30%
+- **Institución:** Duoc UC 
+- **Tipo de evaluación:** Parcial 1 
 - **Plantilla:** arc42 simplificada
 - **Caso empresarial:** Caso 1 — Sistema de Recomendación para E-commerce (ShopFast)
 
-**Equipo N°:** ___
+**Equipo N°:** 1
 
-**Integrantes:** ___________________________________________
+**Integrantes:**
 
-**Docente:** ______________________________________________
+- Martin Higuera
+- Gabriel Durán
+- Francisco Salazar
 
-**Fecha de entrega:** Semana 7 — ____ / ____ / 2026
+**Docente:** Ricardo Aravena Videla
+
+**Fecha de entrega:** Semana 7 — 24 / 09 / 2026
 
 <div style="page-break-after: always;"></div>
 
@@ -396,8 +400,6 @@ Durante el desarrollo de este trabajo se utilizaron herramientas de inteligencia
 
 | Herramienta | Propósito de uso |
 |---|---|
-| [VERIFICAR: p. ej. ChatGPT / Gemini / Copilot] | Redacción inicial, reestructuración y revisión de coherencia y estilo de las secciones del informe. |
-| [VERIFICAR: p. ej. ChatGPT / GitHub Copilot / Mermaid AI] | Generación de borradores de código (plantillas AWS SAM, flujos de GitHub Actions) y bocetos de diagramas de arquitectura, posteriormente editados por el equipo. |
+| OpenCode Zen | Redacción inicial, reestructuración y revisión de coherencia y estilo de las secciones del informe. |
+| OpenCode Zen| Generación de borradores de código (plantillas AWS SAM, flujos de GitHub Actions) y bocetos de diagramas de arquitectura, posteriormente editados por el equipo. |
 | Documentación técnica oficial (AWS, GitHub) y verificación manual | Todo el contenido técnico —arquitectura, servicios, estrategia de despliegue canary y referencias— fue contrastado y verificado por el equipo contra la documentación oficial antes de su inclusión; la responsabilidad del contenido final es del equipo. |
-
-[VERIFICAR: nombre exacto de cada herramienta, versión/modelo y fecha de uso, según lo que realmente empleó el equipo.]
