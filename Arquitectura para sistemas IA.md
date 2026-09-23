@@ -61,11 +61,11 @@
 
 ### 1.1.1 Contexto del caso y problemática
 
-La empresa ShopFast presenta un problema en la recomendación de productos a sus usuarios: específicamente, ha estado afectada por un estancamiento de las ventas en los últimos 6 meses, debido a que los usuarios tienen dificultad para encontrar productos interesantes, lo que genera una tasa de conversión del 2.3% y un valor promedio de compra de 85 USD.
+ShopFast presenta estancamiento de ventas en los últimos 6 meses: los usuarios no encuentran productos interesantes, lo que origina una conversión del 2.3% y un valor promedio de compra de 85 USD.
 
 ### 1.1.2 Objetivo del proyecto
 
-Se busca como solución un sistema de recomendación de productos que aumente la tasa de conversión a 4% y el ticket promedio a 120 USD mediante sugerencias personalizadas.
+Se busca un sistema de recomendación que eleve la conversión a 4% y el ticket promedio a 120 USD mediante sugerencias personalizadas.
 
 ### 1.1.3 Requerimientos funcionales
 
@@ -123,7 +123,7 @@ R.N.F 14: La arquitectura debe ser flexible y desacoplada, permitiendo la sustit
 
 ### 1.1.5 Componentes principales de la arquitectura
 
-Los cuatro componentes exigidos (datos, modelo, API e interfaz) se materializan en ShopFast de la siguiente manera:
+Los cuatro componentes exigidos se materializan en ShopFast así:
 
 | Componente | Función específica | Tecnología en el caso (ShopFast) | Requerimiento(s) que satisface |
 |---|---|---|---|
@@ -132,19 +132,19 @@ Los cuatro componentes exigidos (datos, modelo, API e interfaz) se materializan 
 | **API** | Exponer el modelo como servicio REST seguro, disponible y con control de consumo | Flask sobre AWS Lambda + API Gateway: `GET /recommendations/{user_id}`, `POST /track-interaction`, `GET /health` | R.F 9, R.F 11, R.N.F 1, R.N.F 5, R.N.F 9, R.N.F 10, R.N.F 12 |
 | **Interfaz** | Presentar las recomendaciones al usuario final y permitir su interacción | Frontend React: homepage "Recomendado para ti" (10 productos) y página de producto "También te puede interesar" (5 productos), con tarjetas de imagen, nombre, precio y botón | R.F 1, R.F 2, R.F 3, R.F 4, R.F 10 |
 
-Relacionando cada componente con su función mediante modelos de referencia (apartado c de la pauta), los cuatro encadenan el ciclo de vida **MLOps**: *ingesta* (RDS MySQL + S3) → *entrenamiento* (SageMaker, disparado semanalmente por EventBridge) → *registro de modelo* (S3 como Model Registry del artefacto SVD) → *despliegue* (API Gateway + Lambda con inferencia serverless) → *monitoreo y retroalimentaje* (CloudWatch para métricas/alarms y `POST /track-interaction` para reincorporar interacciones al data lake). Este flujo es la manifestación práctica de la **arquitectura de referencia de AWS** para workloads de IA, en la que cada servicio cubre una etapa del ciclo sin acoplar el modelo al código de la aplicación, cumpliendo además la flexibilidad exigida en R.N.F 14.
+Relacionando componentes y funciones mediante modelos de referencia (apartado c de la pauta), los cuatro encadenan el ciclo **MLOps**: *ingesta* (RDS MySQL + S3) → *entrenamiento* (SageMaker, disparado por EventBridge) → *registro* (S3 como Model Registry del SVD) → *despliegue* (API Gateway + Lambda) → *monitoreo* (CloudWatch y `POST /track-interaction`). Es la manifestación de la **arquitectura de referencia de AWS** para workloads de IA, donde cada servicio cubre una etapa sin acoplar el modelo al código, cumpliendo R.N.F 14.
 
 ### 1.1.6 Ciclo de vida y elementos de los datos
 
-A continuación se describe el ciclo de vida de los datos: desde su ingesta, pasando por su procesamiento y almacenamiento, hasta su consumo por el modelo de aprendizaje.
+El ciclo de vida abarca la ingesta, el procesamiento, el almacenamiento y el consumo por el modelo.
 
 #### Ingesta de los datos
 
-El modelo se alimentará de dos fuentes: los datos que se encuentren en la base de datos de AWS de motor MySQL y los archivos históricos guardados en S3 con una antigüedad de hasta 12 meses. Estos datos serán procesados por un pipeline, con el fin de asegurar que lleguen limpios.
+Se alimenta de dos fuentes: la base de datos AWS de motor MySQL y los archivos históricos de S3 con hasta 12 meses de antigüedad; ambos pasan por un pipeline que asegura datos limpios.
 
 #### Entidades y atributos clave
 
-Como atributos o variables ("_features_") se encuentran **user_id, product_id, interaction_type, rating, timestamp, categoría, precio**. Su rol en el modelo es el siguiente:
+Las _features_ son **user_id, product_id, interaction_type, rating, timestamp, categoría, precio**; su rol en el modelo es el siguiente:
 
 | Atributo ( _feature_ ) | Descripción y rol en el modelo |
 |---|---|
@@ -158,133 +158,131 @@ Como atributos o variables ("_features_") se encuentran **user_id, product_id, i
 
 #### Procesamiento y transformación de los datos
 
-Los datos serán transformados y procesados a través de un pipeline, usando librerías como **pandas**, que agiliza el análisis de datos. La idea es que los datos pasen por una limpieza general: manejo de valores nulos, atípicos o fuera de norma (que rompen reglas de negocio). Se respetarán principios como la integridad de los datos, generando copias de respaldo o eliminando datos que pongan en riesgo la integridad de los usuarios (datos sensibles que el modelo no deba consumir). Se espera que los datasets entregados estén en formato CSV para mayor velocidad de procesamiento.
+Los datos se transforman en un pipeline con **pandas**, limpiando valores nulos y atípicos que rompan reglas de negocio. Se preserva la integridad con copias de respaldo y la eliminación de datos sensibles; los datasets se entregan en formato CSV.
 
 #### Almacenamiento de los datos
 
-Cada tipo de dato reposa según su uso: Amazon RDS (MySQL) para las transacciones operativas diarias y Amazon S3 como _data lake_ para el histórico y los artefactos exportados del modelo. Se usará un data lake porque la fuente de datos tiende a permanecer sin procesar, el modelo se irá "alimentando" de datos crudos desde la fuente, además de ser más económico.
+Cada tipo de dato reposa según su uso: Amazon RDS (MySQL) para las transacciones diarias y Amazon S3 como _data lake_ para el histórico y los artefactos del modelo. Se emplea un data lake porque la fuente permanece sin procesar y su costo es menor.
 
 ### 1.1.7 Elementos AWS y su función
 
-A continuación se desglosan elementos pertenecientes a los servicios que ofrece AWS y cómo se incorporan en el proyecto:
+Elementos de AWS y su función en el proyecto:
 
-- Amazon SageMaker: Orquestador de cómputo para entrenamiento. Ejecuta el job semanal de forma aislada en una instancia ml.t3.medium, entrena las 150K interacciones en 15 minutos y se apaga inmediatamente para reducir costos.
+- **Amazon SageMaker:** cómputo de entrenamiento; ejecuta el job semanal en ml.t3.medium, entrena 150K interacciones en 15 minutos y se apaga.
 
-- Amazon EventBridge: Programador de tareas (scheduler). Dispara automáticamente el reentrenamiento semanal cada domingo a las 2:00 AM conectándose con SageMaker.
+- **Amazon EventBridge:** programador de tareas que dispara el reentrenamiento semanal, cada domingo a las 2:00 AM.
 
-- Amazon S3 (Simple Storage Service): Repositorio central de datos crudos (Data Lake) y registro de artefactos (Model Registry). Guarda tanto el historial de 12 meses como el archivo binario del modelo SVD serializado.
+- **Amazon S3 (Simple Storage Service):** data lake y Model Registry; guarda el historial de 12 meses y el modelo SVD serializado.
 
-- AWS Lambda: Cómputo serverless para inferencia. Carga el modelo y resuelve las solicitudes /recommendations/{user_id} en milisegundos sin mantener servidores dedicados 24/7.
+- **AWS Lambda:** cómputo serverless de inferencia; resuelve `/recommendations/{user_id}` en milisegundos, sin servidores dedicados.
 
-- **Amazon API Gateway:** Punto de entrada y gestión de APIs ( _API Gateway_ ). Maneja el enrutamiento HTTP hacia Lambda, implementa cifrado HTTPS, autentica mediante API Key y aplica _rate limiting_ (100 req/min).
+- **Amazon API Gateway:** gestión de APIs; enruta HTTP hacia Lambda, cifra en HTTPS y aplica autenticación por API Key y _rate limiting_ de 100 req/min.
 
-- **Amazon RDS (MySQL):** Base de datos transaccional ( _OLTP_ ). Almacena las interacciones diarias en caliente (clics, compras, catálogo).
+- **Amazon RDS (MySQL):** base de datos transaccional ( _OLTP_ ) de las interacciones diarias en caliente (clics, compras, catálogo).
 
-- Amazon CloudWatch: Observabilidad y gobernanza. Recolecta logs estructurados con request_id, genera métricas de latencia (p50, p95, p99) y dispara alarmas automáticas si el error rate supera el umbral crítico.
+- **Amazon CloudWatch:** observabilidad; recolecta logs con `request_id`, genera métricas de latencia (p50, p95, p99) y alarma sobre el umbral crítico.
 
-- AWS Systems Manager Parameter Store: Seguridad y configuración. Guarda credenciales y API Keys de manera segura y desacoplada del código fuente.
+- **AWS Systems Manager Parameter Store:** seguridad y configuración; guarda credenciales y API Keys desacopladas del código fuente.
 
 ## 1.2 Principios de diseño arquitectónico
 
-A continuación se explican los principios arquitectónicos que el proyecto debe cumplir: escalabilidad, flexibilidad, seguridad, observabilidad y confiabilidad.
+Principios arquitectónicos que el proyecto cumple: escalabilidad, flexibilidad, seguridad, observabilidad y confiabilidad.
 
 ### 1.2.1 Escalabilidad
 
-La arquitectura implementa es principalmente de tipo escalabilidad horizontal automática y elástica en su capa de servicio al cliente mediante el uso de AWS Lambda y Amazon API Gateway, permitiendo escalar de forma transparente de 0 a 1.000 instancias concurrentes para absorber picos de tráfico (validados con 500 usuarios concurrentes sin errores). En la capa de Machine Learning se aplica un modelo de cómputo efímero bajo demanda a través de Amazon SageMaker y EventBridge, aprovisionando recursos únicamente durante los 15 minutos que toma el reentrenamiento semanal, garantizando alta eficiencia en costos ($0.20/mes en entrenamiento y $28/mes en inferencia).
-
-Este tipo de escalabilidad es favorable para el sitio porque permite seguir funcionando pese a fallos y, además, balancea las cargas automáticamente para recortar gastos: por ejemplo, si una instancia se cae o está cerca de su límite, las peticiones se redirigen hacia otra instancia (evitando que el sistema se rompa); en el caso contrario, se reducen automáticamente las instancias, favoreciendo la disminución de gastos.
+La escalabilidad es horizontal, automática y elástica: AWS Lambda y Amazon API Gateway escalan de 0 a 1.000 instancias concurrentes (validado con 500 usuarios sin errores). En Machine Learning, SageMaker y EventBridge provisionan cómputo efímero solo durante los 15 minutos del reentrenamiento semanal ($0.20/mes en entrenamiento y $28/mes en inferencia). El balanceo redirige el tráfico ante fallos y reduce instancias ante menor demanda.
 
 ### 1.2.2 Flexibilidad
 
-La arquitectura cumple con el principio de flexibilidad mediante el desacoplamiento entre la lógica de servicio y los artefactos de Machine Learning. Al almacenar el modelo como un archivo binario independiente en Amazon S3 y externalizar las variables y credenciales en AWS Systems Manager Parameter Store, el sistema permite sustituir o actualizar el motor de recomendación sin modificar el código base de la API ni alterar los contratos REST expuestos por AWS Lambda y API Gateway. Esta capacidad quedó técnicamente validada en el caso al lograr la migración del algoritmo de SVD a Alternating Least Squares (ALS) en un lapso de 2 horas sin interrumpir la operación del frontend ni requerir cambios estructurales en la infraestructura.
+La flexibilidad se logra desacoplando la lógica de servicio de los artefactos de Machine Learning: el modelo vive como archivo binario en Amazon S3 y las credenciales en AWS Systems Manager Parameter Store. Así se actualiza el motor sin tocar el código de la API ni los contratos REST de AWS Lambda y API Gateway; validado migrando de SVD a Alternating Least Squares (ALS) en 2 horas sin interrumpir el frontend.
 
 ### 1.2.3 Seguridad
 
-La arquitectura aplica una estrategia integral de defensa en profundidad y el principio de mínimo privilegio mediante AWS IAM, garantizando que cada componente computacional solo disponga de los permisos estrictamente necesarios para su operación. En el perímetro, Amazon API Gateway impone cifrado obligatorio vía HTTPS, autenticación basada en API Keys y control de saturación (rate limiting a 100 req/min). La gestión de credenciales se encuentra desacoplada y cifrada en AWS Systems Manager Parameter Store, evitando secretos embebidos en el código. Adicionalmente, se asegura la privacidad de los datos al utilizar datasets anonimizados y logs estructurados en Amazon CloudWatch libres de información de identificación personal (PII), logrando una validación técnica con cero vulnerabilidades críticas en pruebas de penetración (penetration testing).
+La seguridad aplica defensa en profundidad y mínimo privilegio con AWS IAM: cada componente dispone solo de los permisos necesarios. En el perímetro, Amazon API Gateway impone cifrado HTTPS, API Keys y _rate limiting_ a 100 req/min; las credenciales se cifran en AWS Systems Manager Parameter Store, sin secretos en el código. Los datasets se anonimizan y los logs de Amazon CloudWatch carecen de PII, con cero vulnerabilidades críticas en pruebas de penetración ( _penetration testing_ ).
 
 ### 1.2.4 Observabilidad
 
-La arquitectura garantiza una observabilidad integral mediante el ecosistema de Amazon CloudWatch (Logs, Metrics, Dashboards y Alarms), estructurando la supervisión técnica y de negocio en tiempo real. Las trazas de ejecución en AWS Lambda se emiten en formato JSON estructurado con un identificador único (request_id) y sin datos personales (PII), permitiendo una trazabilidad granular. El monitoreo automatizado supervisa percentiles de latencia (p50 en 235ms, p95 en 420ms y p99 en 780ms), arranques en frío (4.2%) y tasas de error (0.8%), configurando alarmas proactivas segmentadas en niveles Warning (latencia >800ms) y Crítica (latencia >1.5s o errores >5%). Esta integración asegura la detección de incidentes en menos de 15 minutos y proporciona las métricas necesarias para gobernar los rollbacks automáticos en el pipeline de despliegue.
+La observabilidad se garantiza con Amazon CloudWatch (Logs, Metrics, Dashboards y Alarms): las trazas de AWS Lambda se emiten en JSON con `request_id` y sin PII. El monitoreo supervisa latencia (p50 235 ms, p95 420 ms, p99 780 ms), arranques en frío (4.2%) y errores (0.8%), con alarmas Warning (>800 ms) y Crítica (>1.5 s o >5%); permite detectar incidentes en menos de 15 minutos y gobierna los rollbacks del pipeline.
 
 ### 1.2.5 Confiabilidad
 
-El sistema implementa mecanismos de tolerancia a fallos y degradación elegante (graceful degradation) para garantizar una disponibilidad continua del 99.4%. A nivel de cliente y API, se establecen políticas de reintento automático ante errores 5xx y un tiempo límite de espera (timeout) de 2 segundos, complementado con un mecanismo de fallback que despliega productos más vendidos cacheados en menos de 500 ms ante cualquier contingencia del motor de recomendaciones. Asimismo, la confiabilidad en los despliegues se asegura mediante un pipeline de CI/CD (GitHub Actions y AWS SAM) con estrategia progresiva tipo Canary (10% de tráfico por minuto) y reversión automática (rollback) si la tasa de error supera el 3%. Finalmente, el almacenamiento inmutable y versionado de modelos en Amazon S3 junto al endpoint GET /health garantizan la recuperabilidad del artefacto y la verificación proactiva del estado operativo del servicio.
+El sistema aplica tolerancia a fallos y degradación elegante ( _graceful degradation_ ) con una disponibilidad del 99.4%: reintento ante errores 5xx, timeout de 2 segundos y fallback de productos más vendidos cacheados en menos de 500 ms. La confiabilidad de los despliegues se asegura con CI/CD (GitHub Actions y AWS SAM) en Canary al 10% por minuto, con rollback si el error supera el 3%; el modelo inmutable en S3 y el endpoint GET /health garantizan recuperabilidad y verificación del estado.
 
 ### 1.2.6 Decisiones arquitectónicas clave, basadas en principios de observabilidad y confiabilidad
 
 **Decisión 1 — Despliegue Canary gobernado por alarmas de CloudWatch**
-- **Decisión:** el pipeline de GitHub Actions + AWS SAM despliega incrementalmente 10% de tráfico por minuto y CloudWatch actúa como árbitro del proceso: si la tasa de error supera el 3%, se revierte automáticamente a la última versión estable.
+- **Decisión:** GitHub Actions + AWS SAM despliegan el 10% de tráfico por minuto; CloudWatch revierte si el error supera el 3%.
 - **Principio(s):** observabilidad y confiabilidad.
-- **Alternativas descartadas:** despliegue directo o _big bang_ (expone el 100% del tráfico sin señal previa de regresión) y _blue/green_ completo (duplica infraestructura, tensionando el límite de costos del R.N.F 4).
-- **Consecuencia/validación:** cumple el R.N.F 13 (Canary 10%/min con rollback ante error >3%) y sostiene el uptime de 99.4%, por sobre el 99% exigido en R.N.F 2.
+- **Alternativas descartadas:** _big bang_ (100% del tráfico sin señal previa) y _blue/green_ completo (duplica infraestructura y el costo del R.N.F 4).
+- **Consecuencia/validación:** cumple R.N.F 13 y sostiene un uptime de 99.4% sobre el 99% exigido en R.N.F 2.
 
 **Decisión 2 — Resiliencia en inferencia: retry, timeout 2 s y fallback**
-- **Decisión:** ante errores 5xx el cliente reintenta una vez con un timeout de 2 segundos y, si el motor falla, degrada a un listado de productos más vendidos cacheado.
+- **Decisión:** ante errores 5xx el cliente reintenta con timeout de 2 s y, si el motor falla, degrada a productos más vendidos cacheados.
 - **Principio(s):** confiabilidad.
-- **Alternativas descartadas:** propagar el error al usuario (rompe la continuidad del servicio) y esperas de retry superiores a 2 s (incompatible con la latencia p95 de 420 ms).
-- **Consecuencia/validación:** cumple R.N.F 12 (fallback en <500 ms) y R.F 8, manteniendo p50 de 235 ms y tasa de error de 0.8%.
+- **Alternativas descartadas:** propagar el error al usuario y reintentos superiores a 2 s (incompatible con la p95 de 420 ms).
+- **Consecuencia/validación:** cumple R.N.F 12 (fallback <500 ms) y R.F 8, con p50 de 235 ms y error de 0.8%.
 
 **Decisión 3 — Trazas `request_id` sin PII y alarmas segmentadas**
-- **Decisión:** Lambda emite logs JSON estructurados con `request_id` y sin datos personales, y CloudWatch configura alarmas Warning (latencia >800 ms) y Crítica (latencia >1.5 s o errores >5%).
+- **Decisión:** Lambda emite logs JSON con `request_id` y sin PII; CloudWatch define alarmas Warning (>800 ms) y Crítica (>1.5 s o >5%).
 - **Principio(s):** observabilidad.
-- **Alternativas descartadas:** logs en texto libre (impiden correlación por petición) y un único umbral de alarma (genera fatiga de alerta o detección tardía).
-- **Consecuencia/validación:** cumple R.N.F 11; permite detectar incidentes en menos de 15 minutos monitoreando p50 235 ms, p95 420 ms, p99 780 ms, cold starts 4.2% y errores 0.8%.
+- **Alternativas descartadas:** logs en texto libre (impiden correlación) y un solo umbral (fatiga o detección tardía).
+- **Consecuencia/validación:** cumple R.N.F 11 y detecta incidentes en menos de 15 minutos con p50 235 ms, p95 420 ms, p99 780 ms, cold starts 4.2% y errores 0.8%.
 
 **Decisión 4 — Modelo inmutable en S3 y health check `/health`**
-- **Decisión:** cada modelo SVD se registra como artefacto versionado e inmutable en S3 y API Gateway expone `GET /health` para verificar el estado operativo antes y durante la operación.
+- **Decisión:** cada modelo SVD se registra como artefacto inmutable y versionado en S3 y API Gateway expone `GET /health`.
 - **Principio(s):** confiabilidad y observabilidad.
-- **Alternativas descartadas:** sobrescribir el archivo del modelo (impide revertir a una versión conocida) y confiar únicamente en la ausencia de errores reportados (detección reactiva).
-- **Consecuencia/validación:** garantiza la recuperabilidad del artefacto y la actualización sin interrupción del R.N.F 14, coherente con R.N.F 6 (S3 como repositorio duradero).
+- **Alternativas descartadas:** sobrescribir el modelo (impide revertir) y confiar en la ausencia de errores (detección reactiva).
+- **Consecuencia/validación:** garantiza la recuperabilidad del artefacto y la actualización sin interrupción del R.N.F 14, coherente con R.N.F 6.
 
 ## 1.3 Especificación de infraestructura
 
-Los recursos computacionales determinados para este sistema se han podido calificar en dos apartados, **entrenamiento y inferencia en tiempo real.**
+Los recursos computacionales se separan en dos apartados: **entrenamiento e inferencia en tiempo real.**
 
 ### 1.3.1 Recursos computacionales (CPU, GPU y TPU)
 
 **Fase de entrenamiento (Amazon SageMaker):**
 
-- **Recursos asignados:** Instancia **ml.t3.medium** equipada con **2 vCPU y 4 GB** de RAM.
+- **Recursos asignados:** instancia **ml.t3.medium** con **2 vCPU y 4 GB** de RAM.
 
-- **Evaluación de GPU/TPU:** No se requiere el aprovisionamiento de aceleradores de hardware como GPU o TPU. El algoritmo de Factorización de Matrices (SVD) utilizado con la librería Surprise es CPU-intensivo y no aprovecha paralelismo masivo de tensores. Con este perfil de CPU, el volumen de 150.000 registros históricos entrena completamente en apenas 15 minutos, representando un costo mínimo de $0.20 USD/mes.
+- **Evaluación de GPU/TPU:** no se requieren aceleradores: el SVD de Surprise es CPU-intensivo y no aprovecha paralelismo de tensores; con este perfil, los 150.000 registros entrenan en 15 minutos a $0.20 USD/mes.
 
 **Fase de inferencia en tiempo real (AWS Lambda):**
 
-- **Recursos asignados:** Funciones serverless configuradas con **1 GB de memoria RAM**.
+- **Recursos asignados:** funciones serverless con **1 GB de memoria RAM**.
 
-- **Evaluación de GPU/TPU:** La inferencia no requiere aceleración por hardware dedicado. La ejecución en CPU sobre arquitectura serverless permite procesar solicitudes en 300 ms ( _warm requests_ ) y escalar elásticamente de 0 a 1.000 instancias concurrentes según la demanda.
+- **Evaluación de GPU/TPU:** no requiere aceleración dedicada: la CPU serverless procesa solicitudes en 300 ms ( _warm requests_ ) y escala de 0 a 1.000 instancias.
 
 ### 1.3.2 Selección de frameworks de desarrollo de IA apropiados
 
-**Framework de IA seleccionado para hacer recomendaciones:**
+**Framework de IA seleccionado:**
 
-- **Python Surprise (versión 1.1.3):** Biblioteca especializada en sistemas de recomendación basados en filtrado colaborativo y factorización matricial explícita/implícita (SVD/ALS). Se selecciona porque está altamente optimizada para ejecutarse en CPU sin requerir dependencias complejas de tensores o aceleradores GPU, logrando entrenar las 150.000 interacciones en solo 15 minutos con métricas sobresalientes (RMSE 0.85 y Precisión@10 de 0.72).
+- **Python Surprise (versión 1.1.3):** recomendación con filtrado colaborativo y factorización matricial (SVD/ALS), optimizada en CPU sin tensores ni GPU; entrena 150.000 interacciones en 15 minutos con RMSE 0.85 y Precisión@10 de 0.72.
 
-**Librerías complementarias del ciclo de datos:**
+**Librerías complementarias:**
 
-- Pandas: Empleada en la capa de datos para la extracción, limpieza de interacciones y estructuración tabular de las variables (user_id, product_id, rating, timestamp, etc.) antes de alimentarlas al algoritmo.
+- Pandas: extracción, limpieza y estructuración tabular de las variables (user_id, product_id, rating, timestamp) antes de alimentar el algoritmo.
 
-- **Flask / Werkzeug:** Microframework ligero que permite encapsular el artefacto serializado del modelo y servirlo como **API REST** dentro del contenedor serverless de AWS Lambda con una latencia p50 de 235 ms.
+- **Flask / Werkzeug:** microframework que encapsula el artefacto serializado y lo sirve como **API REST** dentro del contenedor serverless de AWS Lambda, con latencia p50 de 235 ms.
 
 **Cuestionamiento de frameworks o librerías como TensorFlow / PyTorch:**
 
-- Aunque TensorFlow (mediante módulos como TensorFlow Recommenders) o PyTorch son estándares para arquitecturas neuronales profundas (redes TwoTower, autoencoders), para el tamaño actual del catálogo (5.000 productos) y volumen de usuarios (50.000 clientes), **Surprise ofrece menor complejidad de despliegue, empaquetado mínimo para evitar penalizar el** **_cold start_ de Lambda y cumplimiento total del presupuesto mensual** ($0.20 USD en entrenamiento). Su adopción quedaría reservada como una evolución futura en caso de que el catálogo escale a millones de interacciones o requiera incrustaciones ( _embeddings_ ) multimodales de texto e imagen.
+- Aunque TensorFlow (con TensorFlow Recommenders) o PyTorch son estándar para redes profundas (TwoTower, autoencoders), para los 5.000 productos y 50.000 usuarios actuales, **Surprise ofrece menor complejidad de despliegue, empaquetado mínimo para no penalizar el** **_cold start_ de Lambda y cumplimiento del presupuesto** ($0.20 USD en entrenamiento). Queda reservada como evolución si el catálogo escala o requiere *embeddings* multimodales.
 
 ### 1.3.3 Selección de servicios cloud (AWS, Azure, GCP) considerando almacenamiento, redes de comunicación y escalabilidad
 
-La solución planteada para este caso se despliega sobre la nube de Amazon Web Services (AWS) bajo un patrón puramente _serverless_ y desacoplado, optimizando la relación entre rendimiento y costo operativo ($50 USD/mes frente al límite de $200 USD/mes) **:**
+La solución se despliega sobre Amazon Web Services (AWS) bajo un patrón puramente _serverless_ y desacoplado, con $50 USD/mes frente al límite de $200 USD/mes:
 
-- **Almacenamiento:** Combina persistencia relacional transaccional mediante Amazon RDS (MySQL) para la captura continua de interacciones y catálogo, con almacenamiento masivo y duradero en Amazon S3 para alojar 2 GB de datos históricos y versionar los artefactos binarios del modelo.
+- **Almacenamiento:** Amazon RDS (MySQL) para las transacciones de interacciones y catálogo, más Amazon S3 para 2 GB de datos históricos y versionar artefactos del modelo.
 
-- **Redes y Comunicación:** La gestión perimetral se resuelve con Amazon API Gateway, que centraliza el enrutamiento HTTP, asegura el cifrado HTTPS, impone cuotas de consumo ( _rate limiting_ a 100 req/min) y autentica clientes con API Keys resguardadas en AWS Systems Manager Parameter Store. La orquestación temporal de eventos se delega a Amazon EventBridge para la activación periódica de procesos.
+- **Redes y Comunicación:** Amazon API Gateway centraliza el enrutamiento HTTP, el cifrado HTTPS, el _rate limiting_ (100 req/min) y la autenticación con API Keys en AWS Systems Manager Parameter Store; Amazon EventBridge orquesta los eventos temporales.
 
-- **Cómputo y Escalabilidad:** Se divide en dos frentes complementarios: cómputo elástico horizontal con AWS Lambda (escala de 0 a 1.000 instancias para inferencias con latencia warm de 300 ms) y cómputo efímero vertical con Amazon SageMaker (instancia ml.t3.medium que entrena 150K registros en 15 minutos y se apaga automáticamente).
+- **Cómputo y Escalabilidad:** cómputo elástico horizontal con AWS Lambda (0 a 1.000 instancias, latencia warm de 300 ms) y cómputo efímero vertical con Amazon SageMaker (ml.t3.medium que entrena 150K registros en 15 minutos y se apaga).
 
-- **Observabilidad:** Amazon CloudWatch gobierna la salud de la red y el cómputo mediante trazabilidad estructurada de logs, dashboards en tiempo real y alertas que protegen la estabilidad global del sistema.
+- **Observabilidad:** Amazon CloudWatch gobierna la salud de red y cómputo con logs estructurados, dashboards y alertas.
 
 ### 1.3.4 Dimensionamiento inicial de recursos con estimación de costos
 
-El proyecto tiene como tope de inversión de **200$ USD por mes;** desglosando los gastos y uso destinado, se encuentra lo siguiente:
+El proyecto tiene un tope de inversión de **200$ USD por mes;** su desglose es el siguiente:
 
 | Componente / Servicio | Dimensionamiento de recursos | Frecuencia / Volumen de uso | Costo estimado mensual |
 |---|---|---|---|
@@ -294,17 +292,17 @@ El proyecto tiene como tope de inversión de **200$ USD por mes;** desglosando l
 | **Base de datos relacional (Amazon RDS)** | db.t3.micro con MySQL y 20 GB de almacenamiento | 24/7 para operaciones transaccionales | **$16.00 USD/mes** |
 | **Costo total de la solución** | **Infraestructura serverless + RDS** | — | **~$50.00 USD/mes** (aprox. $44.25 – $50 USD) |
 
-**Costo de arquitectura tradicional (alternativa descartada):** Mantener instancias de cómputo dedicadas tipo Amazon EC2 encendidas 24/7 costaría **$180 USD/mes**, el cual es caro considerando el presupuesto, mientras que la solución serverless (Lambda + SageMaker) factura exclusivamente por los milisegundos reales de cómputo consumidos durante las invocaciones y los 15 minutos del entrenamiento semanal.
+**Costo de arquitectura tradicional (alternativa descartada):** instancias tipo Amazon EC2 24/7 costarían **$180 USD/mes**, cifra cara para el presupuesto, mientras que la solución serverless (Lambda + SageMaker) factura solo los milisegundos de cómputo de las invocaciones y los 15 minutos de entrenamiento semanal.
 
 ## 1.4 Estrategias de integración y despliegue
 
-Como estrategia de integración y entrega se seleccionó **CI/CD (Continuous Integration / Continuous Deployment)**: con herramientas como **GitHub Actions** se genera un filtro de calidad antes de entrar a producción, controlando los fallos y evitando afectar la experiencia del usuario; la herramienta **AWS SAM** complementa este control durante el despliegue.
+Se seleccionó **CI/CD (Continuous Integration / Continuous Deployment)** como estrategia de integración y entrega: **GitHub Actions** filtra la calidad antes de producción, controlando fallos, y **AWS SAM** complementa ese control en el despliegue.
 
-Como estrategia de despliegue de modelos en producción se seleccionó **Canary Deployment**, la cual minimiza el riesgo frente a los usuarios: a medida que las métricas son positivas, el modelo se despliega progresivamente, reduciendo la probabilidad de fallos que arruinen la experiencia de los usuarios.
+Como despliegue de modelos en producción se eligió **Canary Deployment**, que minimiza el riesgo al progresar el despliegue a medida que las métricas son positivas.
 
 ### 1.4.1 Uso de edge computing
 
-Dentro de la selección de estrategias de despliegue también se evaluó el *edge computing*, es decir, ejecutar lógica y almacenar contenido en puntos de la red cercanos al usuario final. Para ShopFast se recomienda una **adopción parcial** coherente con su patrón *serverless*: servir el frontend React mediante **Amazon CloudFront** y usar **Lambda@Edge** para cachear cerca del usuario el *fallback* de productos más vendidos (R.F 8), de modo que la respuesta degradada se cumpla en menos de 500 ms incluso si el motor de recomendaciones falla (R.N.F 12), mejorando la latencia efectiva y la tolerancia a fallos sin duplicar infraestructura (uso actual ~$50 de un tope de $200/mes). Se descarta, en cambio, llevar la inferencia SVD al *edge*: el modelo se reentrena de forma centralizada y semanal (SageMaker), mantiene estado compartido en RDS y S3, y su serializado periódico en nodos distribuidos elevaría la complejidad y el costo sin beneficio medible frente a la latencia *warm* de 300 ms ya alcanzada. El cómputo *edge* queda, por tanto, limitado a entrega y caché, no a inferencia.
+Dentro de las estrategias de despliegue se evaluó el *edge computing*: ejecutar lógica y almacenar contenido cerca del usuario. Para ShopFast se recomienda una **adopción parcial** coherente con su patrón *serverless*: servir el frontend React con **Amazon CloudFront** y usar **Lambda@Edge** para cachear el *fallback* de más vendidos (R.F 8), cumpliendo menos de 500 ms aunque el motor falle (R.N.F 12) y sin duplicar infraestructura (~$50 de un tope de $200/mes). Se descarta la inferencia SVD en *edge*: el modelo se reentrena de forma centralizada y semanal (SageMaker) con estado en RDS y S3, y serializarlo en nodos distribuidos encarecería el sistema sin superar la latencia *warm* de 300 ms. El cómputo *edge* queda limitado a entrega y caché, no a inferencia.
 
 ### 1.4.2 Comparación de alternativas de integración evaluando eficiencia, rendimiento y confiabilidad
 
@@ -319,64 +317,64 @@ Se evaluaron además las estrategias **Blue/Green Deployment, Rolling (Progresiv
 | Shadow | Media: duplica tráfico sin impacto en usuario | Alto para comparar versiones en paralelo | Alta para validación, nula para el usuario | Descartada: el usuario nunca ve el modelo, no mide la conversión |
 | **Canary (elegida)** | **Alta: un solo entorno, despliegue gradual de 10% por minuto** | **Se valida con tráfico real desde el primer minuto** | **Alta: rollback automático si el error rate supera el 3%** | **Elegida: progresión hasta el 100% con reversión automática** |
 
-Se elige Canary porque es la alternativa más **eficiente** al operar sobre un único entorno *serverless* sin duplicar costos, la de mejor **rendimiento** observable al medir el modelo SVD con tráfico real desde el 10% inicial, y la más **confiable** al acoplar CloudWatch a un rollback automático ante un error rate superior al 3%. Las alternativas evaluadas se detallan a continuación:
+Se elige Canary por ser la más **eficiente** (un solo entorno *serverless*, sin duplicar costos), la de mejor **rendimiento** (modelo SVD medido con tráfico real desde el 10%) y la más **confiable** (CloudWatch con rollback ante errores >3%). Las alternativas son:
 
 #### Blue/Green Deployment
 
-Este método de despliegue consiste en mantener dos entornos de producción idénticos: uno activo recibiendo el 100% del tráfico ( **Blue** ) y otro inactivo donde se despliega la nueva versión ( **Green** ). Una vez validado Green, el enrutador cambia el 100% del tráfico de golpe de Blue a Green. A pesar de que esta metodología tenga la ventaja de reversiones inmediatas y no generar inactividad, el **principal problema con esta estrategia es el costo**: mantener dos entornos de producción duplica los costos, es decir, como mínimo se debería duplicar el presupuesto inicial, lo que lo hace financieramente inviable.
+Mantiene dos entornos de producción idénticos: uno activo con el 100% del tráfico ( **Blue** ) y otro inactivo con la nueva versión ( **Green** ); validado Green, el enrutador cambia todo el tráfico de golpe. Ofrece reversiones inmediatas y cero inactividad, pero el **principal problema es el costo**: duplica entornos y presupuesto, lo que la hace financieramente inviable.
 
 #### Rolling (Progresivo)
 
-Estrategia con despliegue gradual que sustituye las versiones antiguas por las nuevas instancia por instancia o servidor por servidor, de forma escalonada. A pesar de que esta estrategia es eficaz para microservicios, se debe tener en cuenta la alta compatibilidad entre los códigos y bases de datos, lo que quiere decir que para funciones más complejas, como la integración de pipelines y modelos de aprendizaje continuo en este caso, puede costar tiempo e incluso más dinero, porque no permite ver de forma gradual cómo rinde el modelo en producción.
+Despliegue gradual que sustituye versiones instancia por instancia, de forma escalonada. Aunque es eficaz para microservicios, exige alta compatibilidad entre códigos y bases de datos; en funciones complejas, como integrar pipelines y modelos de aprendizaje continuo, cuesta tiempo y dinero, porque no permite ver gradualmente el rendimiento del modelo en producción.
 
 #### Big Bang
 
-Consiste en apagar el sistema antiguo y activar el nuevo de golpe para el 100% de los usuarios, realizando un reemplazo total en un solo evento. Es el método más riesgoso, se descarta debido a que no permite calificar el rendimiento del modelo de manera gradual.
+Apaga el sistema antiguo y activa el nuevo de golpe para el 100% de los usuarios, en un solo evento. Es el más riesgoso y no permite calificar gradualmente el rendimiento del modelo.
 
 #### Despliegue por fases
 
-Implementa el software de manera paulatina segmentando por grupos de usuarios, regiones geográficas, áreas de la empresa o módulos específicos. Debido a que es un sistema de comercio electrónico, es clave que la mayor cantidad de usuarios puedan comprar y además recibir recomendaciones; además, desplegar por regiones significa mayor inversión, específicamente en el soporte.
+Se segmenta por grupos de usuarios, regiones geográficas, áreas de la empresa o módulos. En un comercio electrónico es clave que la mayor cantidad de usuarios compre y reciba recomendaciones; además, desplegar por regiones implica mayor inversión, especialmente en soporte.
 
 #### Despliegue Shadow
 
-Este despliegue consiste en duplicar el tráfico entrante en tiempo real de la versión activa de producción y enviar una copia exacta a una nueva versión oculta (shadow). La versión activa procesa la solicitud y responde al usuario normalmente, mientras que la versión oculta procesa la copia de la solicitud en segundo plano. Las respuestas de esta nueva versión se registran para su análisis, pero se descartan y nunca llegan al usuario final. El problema con esta estrategia es que el proyecto busca aumentar la tasa de conversión al 4% y el ticket promedio a $120 USD. Para validar si el algoritmo logra esto, es obligatorio que los usuarios reales vean las recomendaciones y decidan si hacen clic en ellas o no, lo que esta estrategia no ofrece porque el modelo real nunca llega al usuario.
+Duplica el tráfico de la versión activa y envía una copia a una versión oculta ( _shadow_ ) que procesa en segundo plano; sus respuestas se registran para análisis, pero no llegan al usuario. El proyecto busca llevar la conversión al 4% y el ticket a $120 USD, lo que obliga a que los usuarios reales vean las recomendaciones y decidan si hacen clic, algo que esta estrategia no ofrece.
 
 ### 1.4.3 Pipeline de integración continua y despliegue continuo (CI/CD)
 
-El sistema de ShopFast implementa un flujo de CI/CD automatizado enfocado en minimizar errores en producción, asegurar pruebas de calidad y mitigar riesgos comerciales mediante liberaciones progresivas.
+ShopFast implementa un flujo de CI/CD automatizado para minimizar errores en producción, asegurar calidad y mitigar riesgos mediante liberaciones progresivas.
 
 #### Herramientas involucradas y su función
 
-- **GitHub Actions:** plataforma central de orquestación y automatización del pipeline. Escucha los eventos de código (como un push a la rama main) y ejecuta los flujos de trabajo ( _workflows_ ) secuenciales de compilación, análisis y despliegue.
+- **GitHub Actions:** orquestación central; escucha los eventos de código ( _push_ a main) y ejecuta los flujos ( _workflows_ ) de compilación, análisis y despliegue.
 
-- **pytest:** framework de ejecución de pruebas automatizadas en Python. Corre las pruebas unitarias y las validaciones de integración tanto en la fase inicial de construcción como tras el despliegue en el entorno de pruebas ( _staging_ ).
+- **pytest:** pruebas automatizadas en Python; corre unitarias y de integración en la construcción y en _staging_.
 
-- **AWS SAM (Serverless Application Model):** herramienta de Infraestructura como Código (IaC) orientada a arquitecturas serverless. Empaqueta la función AWS Lambda, define los contratos de Amazon API Gateway y gestiona los despliegues progresivos controlando la ponderación del tráfico.
+- **AWS SAM (Serverless Application Model):** IaC serverless; empaqueta la función AWS Lambda, define los contratos de Amazon API Gateway y pondera el tráfico en los despliegues.
 
-- **Amazon CloudWatch:** sistema de monitoreo y telemetría en tiempo real. Supervisa la tasa de errores durante la fase de despliegue canary para activar el mecanismo de reversión automática si se degradan las métricas.
+- **Amazon CloudWatch:** monitoreo en tiempo real; supervisa el error en la fase canary para activar la reversión automática.
 
 #### Flujo del pipeline paso a paso
 
-El proceso de entrega continua se ejecuta en 5 etapas secuenciales:
+El proceso se ejecuta en 5 etapas secuenciales:
 
 1. **Push a rama main y construcción (Build):**
    - El desarrollador sube los cambios aprobados al repositorio.
-   - Se ejecutan automáticamente las pruebas unitarias con pytest, el análisis estático de código (linting) y los escaneos de seguridad en busca de vulnerabilidades.
+   - Se ejecutan pruebas unitarias (pytest), análisis estático ( _linting_ ) y escaneos de seguridad.
 
 2. **Despliegue a staging y pruebas de integración:**
-   - Si el paso anterior es exitoso, AWS SAM despliega los artefactos en un entorno de pruebas ( _staging_ ) idéntico a producción.
-   - Se ejecutan 5 validaciones automáticas de pruebas de integración para certificar la comunicación entre endpoints y bases de datos.
+   - Si es exitoso, AWS SAM despliega los artefactos en un entorno _staging_ idéntico a producción.
+   - 5 pruebas de integración automáticas certifican la comunicación entre endpoints y bases de datos.
 
 3. **Aprobación manual ( _gate_ de control):**
-   - Se establece una pausa de control donde un responsable técnico o líder del proyecto valida los resultados de staging y aprueba explícitamente el paso a producción.
+   - Un responsable técnico valida _staging_ y aprueba el paso a producción.
 
 4. **Despliegue progresivo en producción (Canary):**
-   - El despliegue a producción no se hace de golpe; AWS SAM enruta inicialmente solo el 10% del tráfico real a la nueva versión.
-   - De forma controlada, el tráfico se incrementa en un 10% adicional cada minuto hasta alcanzar el 100% de los usuarios si las condiciones operativas son estables.
+   - AWS SAM enruta inicialmente solo el 10% del tráfico real a la nueva versión.
+   - Aumenta un 10% por minuto hasta el 100%, si las condiciones son estables.
 
 5. **Monitoreo y reversión automática ( _rollback_ ):**
-   - Durante el despliegue canary, se evalúan constantemente las métricas en CloudWatch.
-   - Si la tasa de errores del sistema supera el 3% (error rate > 3%), el pipeline interrumpe el despliegue y ejecuta un rollback automático instantáneo hacia la versión previa estable, evitando afectaciones masivas a las ventanas de despliegue.
+   - Se evalúan en CloudWatch las métricas durante el despliegue canary.
+   - Si el error rate supera el 3%, el pipeline interrumpe y ejecuta un rollback instantáneo hacia la versión previa estable.
 
 ### 1.4.4 Diagrama de flujo de despliegue
 
