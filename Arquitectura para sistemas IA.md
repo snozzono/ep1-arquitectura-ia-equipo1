@@ -376,9 +376,9 @@ El proceso de entrega continua se ejecuta en 5 etapas secuenciales:
 
 ### 1.4.4 Diagrama de flujo de despliegue
 
-![Diagrama de flujo de despliegue (elaborado en Draw.io)](DiagramaShopPipeline.jpg)
+![Diagrama de flujo de despliegue (elaborado en Draw.io)](arquitectura%20parcial%201.drawio.png)
 
-_Diagrama elaborado en Draw.io (fuente editable: DiagramaShopPipeline.drawio)._
+_Diagrama elaborado en Draw.io (fuente editable: DiagramaShopPipeline_v2.drawio)._
 
 ## Referencias
 
