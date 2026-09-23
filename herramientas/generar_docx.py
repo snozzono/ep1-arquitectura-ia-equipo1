@@ -8,8 +8,9 @@ from docx import Document
 from docx.shared import Pt, Cm, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 
-SRC = "Arquitectura para sistemas IA.md"
-OUT = "EP1_Equipo1_HigueraDuranSalazar.docx"
+ROOT = pathlib.Path(__file__).resolve().parent.parent
+SRC = ROOT / "trabajo" / "Arquitectura para sistemas IA.md"
+OUT = ROOT / "entregables" / "EP1_Equipo1_HigueraDuranSalazar.docx"
 
 TOK = re.compile(r"(`[^`\n]+`)|(\*\*[^*\n]+\*\*)|(\*[^*\n]+\*|_[^_\n]+_)")
 
@@ -127,8 +128,8 @@ while i < len(lines):
         continue
 
     m = re.match(r"^!\[([^\]]*)\]\(([^)]+)\)", line)
-    if m:                                    # imagen
-        doc.add_picture(unquote(m.group(2)), width=Cm(14.5))
+    if m:                                    # imagen (resuelta respecto al .md)
+        doc.add_picture(str(SRC.parent / unquote(m.group(2))), width=Cm(14.5))
         doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
         continue
 
